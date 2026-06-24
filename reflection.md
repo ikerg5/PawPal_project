@@ -4,7 +4,12 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
+1. Set up their profile and pet — The user enters basic info like their name, their pet's name, and how many minutes they have available in a day. This gives the app the context it needs to make a realistic plan.
+
+2. Add care tasks — The user can add things their pet needs that day, like a walk, feeding, or giving medicine. Each task has a name, how long it takes, and how important it is (high, medium, or low priority).
+
+3. Generate a daily schedule — Once the tasks are added, the user clicks a button and the app figures out which tasks fit in the available time, puts the most important ones first, and shows a clear plan for the day.
+
 - What classes did you include, and what responsibilities did you assign to each?
 
 **b. Design changes**
