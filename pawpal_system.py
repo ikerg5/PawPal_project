@@ -34,9 +34,11 @@ class Owner:
 
 
 class Scheduler:
-    def __init__(self, tasks: List[Task], available_minutes: int):
+    def __init__(self, tasks: List[Task], available_minutes: int, pet_name: str = "", species: str = ""):
         self.tasks = tasks
         self.available_minutes = available_minutes
+        self.pet_name = pet_name
+        self.species = species
 
     def sort_by_priority(self) -> List[Task]:
         pass
@@ -49,7 +51,9 @@ class Scheduler:
 
 
 class DailyPlan:
-    def __init__(self):
+    def __init__(self, pet_name: str = "", species: str = ""):
+        self.pet_name = pet_name
+        self.species = species
         self.scheduled_tasks: List[Task] = []
         self.total_time_used: int = 0
 
