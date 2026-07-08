@@ -81,26 +81,56 @@ else:
         with tcol3:
             priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
+        tcol4, tcol5 = st.columns(2)
+        with tcol4:
+            task_time = st.time_input("Scheduled time", value=None)
+        with tcol5:
+            frequency = st.selectbox("Frequency", ["once", "daily", "weekly"])
+
         if st.form_submit_button("Add task"):
             selected_pet = next(pet for pet in owner.pets if pet.name == selected_pet_name)
             selected_pet.add_task(
-                Task(title=task_title, duration_minutes=int(duration), priority=priority)
+                Task(
+                    title=task_title,
+                    duration_minutes=int(duration),
+                    priority=priority,
+                    time=task_time.strftime("%H:%M") if task_time else "",
+                    frequency=frequency,
+                )
             )
 
+    scheduler = Scheduler(owner)
     all_tasks = owner.get_all_tasks()
+
     if all_tasks:
-        st.write("Current tasks:")
-        st.table(
-            [
-                {
-                    "pet": task.pet_name,
-                    "title": task.title,
-                    "duration_minutes": task.duration_minutes,
-                    "priority": task.priority,
-                }
-                for task in all_tasks
-            ]
-        )
+        # Show tasks in chronological order so the owner can scan the day at a glance.
+        sorted_tasks = scheduler.sort_by_time(all_tasks)
+
+        conflicts = scheduler.detect_conflicts(all_tasks)
+        for warning in conflicts:
+            st.warning(f"⚠️ {warning} — these tasks overlap, consider rescheduling one.")
+
+        st.write("Current tasks (sorted by time):")
+
+        for task in sorted_tasks:
+            tcol, ccol = st.columns([5, 1])
+            with tcol:
+                st.write(
+                    f"**{task.time or '--:--'}** — [{task.pet_name}] {task.title} "
+                    f"({task.duration_minutes} min, {task.priority} priority"
+                    f"{', ' + task.frequency if task.frequency != 'once' else ''})"
+                )
+            with ccol:
+                already_complete = task.is_complete
+                if st.checkbox("Done", value=already_complete, key=f"complete-{id(task)}") and not already_complete:
+                    owning_pet = next(pet for pet in owner.pets if pet.name == task.pet_name)
+                    next_task = owning_pet.complete_task(task)
+                    if next_task is not None:
+                        st.success(
+                            f"'{task.title}' completed — next {task.frequency} occurrence "
+                            f"scheduled for {next_task.due_date}."
+                        )
+                    st.rerun()
     else:
         st.info("No tasks yet. Add one above.")
 
@@ -111,5 +141,13 @@ st.subheader("Build Schedule")
 
 if st.button("Generate schedule"):
     scheduler = Scheduler(owner)
+    all_tasks = owner.get_all_tasks()
+
+    conflicts = scheduler.detect_conflicts(all_tasks)
+    for warning in conflicts:
+        st.warning(f"⚠️ {warning}")
+
     plan = scheduler.generate_plan()
+    if plan.scheduled_tasks:
+        st.success(f"Plan generated — {plan.total_time_used} of {owner.available_minutes} minutes used.")
     st.code(plan.display())

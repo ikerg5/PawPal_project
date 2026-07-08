@@ -1,0 +1,56 @@
+classDiagram
+    class Task {
+        +String title
+        +int duration_minutes
+        +String priority
+        +String time
+        +String frequency
+        +bool is_complete
+        +String pet_name
+        +date due_date
+        +mark_complete()
+        +next_occurrence() Task
+        +display() str
+    }
+
+    class Pet {
+        +String name
+        +String species
+        +List~Task~ tasks
+        +add_task(task)
+        +complete_task(task) Task
+        +task_count() int
+    }
+
+    class Owner {
+        +String name
+        +int available_minutes
+        +List~Pet~ pets
+        +add_pet(pet)
+        +get_all_tasks() List~Task~
+    }
+
+    class Scheduler {
+        +Owner owner
+        +sort_by_priority(tasks) List~Task~
+        +sort_by_time(tasks) List~Task~
+        +filter_by_pet(tasks, pet_name) List~Task~
+        +filter_by_status(tasks, is_complete) List~Task~
+        +detect_conflicts(tasks) List~String~
+        +filter_by_time(sorted_tasks) List~Task~
+        +generate_plan() DailyPlan
+    }
+
+    class DailyPlan {
+        +String owner_name
+        +List~Task~ scheduled_tasks
+        +int total_time_used
+        +add_task(task)
+        +display() str
+    }
+
+    Owner "1" --> "0..*" Pet : owns
+    Pet "1" --> "0..*" Task : has
+    Pet ..> Task : complete_task() creates next occurrence
+    Scheduler --> Owner : reads tasks from
+    Scheduler --> DailyPlan : produces

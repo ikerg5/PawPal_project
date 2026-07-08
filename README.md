@@ -42,6 +42,15 @@ pip install -r requirements.txt
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
 
+## ✨ Features
+
+- **Multi-pet management** — one owner can track any number of pets, each with its own task list
+- **Priority-based scheduling** — `Scheduler.generate_plan()` sorts tasks high → medium → low priority and greedily fits as many as possible into the owner's available minutes
+- **Sorting by time** — `Scheduler.sort_by_time()` orders tasks chronologically by their `"HH:MM"` scheduled time
+- **Filtering** — `Scheduler.filter_by_pet()` and `filter_by_status()` narrow the task list down to one pet or one completion state
+- **Conflict warnings** — `Scheduler.detect_conflicts()` flags any tasks scheduled at the same time (even across different pets) and surfaces a warning instead of silently double-booking
+- **Daily recurrence** — completing a `"daily"` or `"weekly"` task automatically creates the next occurrence, due exactly 1 day or 1 week later, via `Task.next_occurrence()` and `Pet.complete_task()`
+
 ## 🖥️ Sample Output
 
 Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
@@ -112,12 +121,73 @@ tests/test_pawpal.py::test_generate_plan_for_owner_with_no_pets_returns_empty_pl
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+### UI features and available actions
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+The Streamlit app (`app.py`) lets a user:
+
+- Set their **owner name** and **available minutes** for the day
+- **Add pets** (name + species), shown in a running table with each pet's task count
+- **Add tasks** to a specific pet, including title, duration, priority, an optional scheduled time, and a frequency (`once`/`daily`/`weekly`)
+- View the **current task list sorted chronologically by time**
+- See a **warning banner** immediately if two tasks land at the same time, before even generating a schedule
+- **Check off tasks as done** — completing a recurring task automatically creates and reports its next occurrence
+- Click **"Generate schedule"** to build and display the day's time-boxed plan
+
+### Example workflow
+
+1. Enter the owner's name and available minutes (e.g., "Jordan", 60 minutes).
+2. Add two pets: "Biscuit" (dog) and "Mochi" (cat).
+3. Add tasks for each pet with different times and priorities — including one deliberate clash, e.g. both pets with a task at 08:00.
+4. Notice the conflict warning appear above the task list as soon as the clash exists.
+5. Check off a daily task as "Done" and see a confirmation that tomorrow's occurrence was created automatically.
+6. Click "Generate schedule" to see the final plan: highest-priority tasks first, cut off once the available minutes run out.
+
+### Key Scheduler behaviors shown
+
+- **Sorting** — tasks display in time order (`Scheduler.sort_by_time()`) and get prioritized high → low when building the plan (`Scheduler.sort_by_priority()`)
+- **Conflict warnings** — `Scheduler.detect_conflicts()` catches the same-time clash and surfaces it as a banner
+- **Recurrence** — `Pet.complete_task()` auto-spawns tomorrow's/next week's task when a recurring task is checked off
+
+### Sample CLI output (`python main.py`)
+
+```
+All tasks sorted by time:
+  08:00  [ ] [Biscuit] Morning walk (30 min, high priority)
+  08:00  [ ] [Mochi] Feeding (10 min, high priority)
+  09:00  [ ] [Mochi] Litter box cleaning (10 min, medium priority)
+  12:30  [ ] [Biscuit] Brushing (15 min, low priority)
+  17:00  [ ] [Mochi] Playtime (20 min, medium priority)
+  18:00  [ ] [Biscuit] Feeding (10 min, high priority)
+
+Biscuit's tasks only (filter_by_pet):
+  [ ] [Biscuit] Feeding (10 min, high priority)
+  [ ] [Biscuit] Morning walk (30 min, high priority)
+  [ ] [Biscuit] Brushing (15 min, low priority)
+
+Incomplete tasks only (filter_by_status):
+  [ ] [Biscuit] Feeding (10 min, high priority)
+  [ ] [Biscuit] Morning walk (30 min, high priority)
+  [ ] [Biscuit] Brushing (15 min, low priority)
+  [ ] [Mochi] Playtime (20 min, medium priority)
+  [ ] [Mochi] Litter box cleaning (10 min, medium priority)
+  [ ] [Mochi] Feeding (10 min, high priority)
+
+Conflict check:
+  WARNING: Conflict at 08:00 — Biscuit: Morning walk, Mochi: Feeding
+
+Today's Schedule for Jordan
+---------------------------
+  [ ] [Biscuit] Feeding (10 min, high priority)
+  [ ] [Biscuit] Morning walk (30 min, high priority)
+  [ ] [Mochi] Feeding (10 min, high priority)
+  [ ] [Mochi] Litter box cleaning (10 min, medium priority)
+
+Total time used: 60 minutes
+
+Completing Biscuit's daily 'Morning walk'...
+  Completed: [x] [Biscuit] Morning walk (30 min, high priority) (was due 2026-07-07)
+  Next occurrence auto-created: [ ] [Biscuit] Morning walk (30 min, high priority) (due 2026-07-08)
+  Biscuit now has 4 tasks
+```
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
