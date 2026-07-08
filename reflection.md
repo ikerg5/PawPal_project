@@ -10,21 +10,21 @@
 
 3. Generate a daily schedule — Once the tasks are added, the user clicks a button and the app figures out which tasks fit in the available time, puts the most important ones first, and shows a clear plan for the day.
 
-I included four classes, each with a single, clear responsibility:
+I ended up with four classes, each doing one job:
 
-- **Owner** — holds the user's identity and their available time budget (`name`, `available_minutes`). It's responsible for owning a `Pet` and exposing `add_pet()`.
-- **Pet** — holds the pet's identity (`name`, `species`) and the list of `Task`s that apply to it. Responsible for `add_task()`.
-- **Task** — a simple data container (`title`, `duration_minutes`, `priority`, `is_recurring`) with a `display()` method to render one task. It has no behavior beyond describing itself — all decision-making lives in `Scheduler`.
-- **Scheduler** — takes a list of tasks and the available minutes and is responsible for turning them into an ordered, time-boxed plan (`sort_by_priority()`, `filter_by_time()`, `generate_plan()`). This keeps scheduling logic out of `Pet`/`Task` so those stay simple data holders.
-- **DailyPlan** — the output object: the final ordered list of tasks that fit in the day, plus the total time used, and a `display()` method for showing the result to the user.
+- **Owner** — the person using the app. Holds their name and how many minutes they have available, and owns the pets.
+- **Pet** — a pet's name, species, and the list of tasks assigned to it.
+- **Task** — one care activity: title, duration, priority, whether it's done yet. It doesn't do anything smart on its own, it just holds data.
+- **Scheduler** — the "brain." It takes the tasks and figures out the order and what fits in the available time.
+- **DailyPlan** — the final result: the list of tasks that made the cut, plus the total time used.
 
-Splitting `Scheduler` (decision-making) from `DailyPlan` (result) means the scheduling algorithm can change without touching how a plan is displayed.
+I kept `Scheduler` (the decision-making) separate from `DailyPlan` (the result) so I could change how the scheduling works later without having to change how the plan gets displayed.
 
 **b. Design changes**
 
-After asking my AI assistant to review `pawpal_system.py` for missing relationships or logic bottlenecks, it flagged that `Scheduler` and `DailyPlan` had no way to know which pet the plan was for — there was no `pet_name`/`species` field anywhere in those two classes, even though the README's sample output ("Daily plan for Biscuit (Golden Retriever):") requires that context to render the plan.
+I asked my AI assistant to look over `pawpal_system.py` and check for anything missing. It pointed out that `Scheduler` and `DailyPlan` had no way of knowing which pet a plan was actually for — there was no pet name anywhere in those classes, even though the sample output in the README ("Daily plan for Biscuit...") needed that info to make sense.
 
-I fixed this by adding `pet_name` and `species` fields to both `Scheduler.__init__` and `DailyPlan.__init__`, so the final `display()` output can include which pet the plan belongs to. I chose to pass these as plain strings (rather than passing the whole `Pet` object into `Scheduler`) to keep `Scheduler` decoupled from the `Pet`/`Owner` classes — it only needs the pet's name and species for display, not the full object.
+So I added a pet name (and species) to both classes so the final schedule can actually say whose plan it is. I kept it as just a name/string instead of passing the whole `Pet` object in, since `Scheduler` really only needs the name for display, not the whole object.
 
 ---
 
@@ -32,17 +32,17 @@ I fixed this by adding `pet_name` and `species` fields to both `Scheduler.__init
 
 **a. Constraints and priorities**
 
-The scheduler considers three constraints: **priority** (high/medium/low), the owner's **available minutes** for the day, and each task's **scheduled time** (`"HH:MM"`, used for chronological ordering and conflict detection).
+The scheduler cares about three things: **priority** (high/medium/low), how many **minutes the owner has available**, and each task's **scheduled time** (used for putting things in order and catching conflicts).
 
-Priority and available time mattered most because they map directly to the scenario: a busy pet owner has a hard time budget, and if not everything fits, the most important care tasks (feeding, meds) should be guaranteed a slot before "nice to have" ones (brushing) get dropped. That's why `generate_plan()` sorts by priority *before* filtering by time — a low-priority task added first should never bump a high-priority one out of the plan.
+Priority and available time matter the most because that's the actual problem a busy pet owner has — not enough time for everything. So if not all tasks fit, the important ones (like feeding) should win a spot over the "nice to have" ones (like brushing). That's why the scheduler sorts by priority first, then cuts things off once it runs out of time, instead of the other way around.
 
 **b. Tradeoffs**
 
-`Scheduler.detect_conflicts()` only checks for **exact time matches** (two tasks with the identical `"HH:MM"` string) rather than checking whether task durations actually *overlap*. For example, a 30-minute walk starting at 08:00 and a 10-minute feeding starting at 08:15 would not be flagged, even though the walk is still in progress when the feeding starts.
+My conflict checker (`detect_conflicts()`) only catches tasks that start at the **exact same time**. It doesn't check if tasks actually overlap. So a 30-minute walk at 08:00 and a 10-minute feeding at 08:15 wouldn't get flagged, even though the walk is technically still happening.
 
-I chose exact-match checking because it's simple, fast (an O(n) grouping by time string), and easy to reason about, which matters for a first pass at conflict detection. The tradeoff is that it will miss genuine overlaps that don't share a start time. This is reasonable for now because most pet care tasks in this app are short and manually scheduled by the owner, so exact clashes are the most common and most obviously avoidable case — but a more accurate version would need to compare `[start, start + duration]` time ranges pairwise instead of just grouping by a single time string.
+I went with the simple exact-match version because it's easy to write, easy to understand, and fast. The downside is it misses real overlaps that don't start at the same minute. I think that's an okay tradeoff for now since most tasks in this app get typed in by hand and exact-time clashes are the most obvious/common mistake to catch — but a better version would need to actually compare start and end times against each other instead of just grouping by one time string.
 
-I also considered rewriting `detect_conflicts()` with a `collections.defaultdict` and a list comprehension instead of the explicit loop with `setdefault()`. I kept the explicit loop version — it's a few lines longer, but reads top-to-bottom in the order the logic actually executes (group, then filter, then format), which matters more than saving a few lines in a project meant to be read and graded.
+I also asked my AI assistant if this method could be written more "Pythonic," and it suggested a version using `collections.defaultdict` and a list comprehension. I decided not to use it — it was a bit shorter, but it crammed everything into one dense expression that's harder to read at a glance. I kept my original loop version since it's easier to follow step by step, which felt more important than saving a couple lines.
 
 ---
 
@@ -50,15 +50,15 @@ I also considered rewriting `detect_conflicts()` with a `collections.defaultdict
 
 **a. How you used AI**
 
-I used my AI coding assistant across every phase of the build: turning the Mermaid UML into Python class stubs, implementing the scheduling algorithms, wiring the Streamlit UI to the backend, writing the test suite, and drafting documentation. Keeping each phase in its own conversation (as the project instructions suggested) was genuinely useful for staying organized — it meant the assistant's attention in the "testing" phase, for example, wasn't cluttered with earlier back-and-forth about UI layout, and I could reference exactly the right files for the task at hand instead of it re-surfacing stale context.
+I used my AI assistant through basically every step of building this: turning my UML sketch into class stubs, writing the actual scheduling logic, hooking the Streamlit UI up to the backend, writing tests, and cleaning up the docs. I kept each phase in a separate conversation like the instructions suggested, and that actually helped — when I was working on tests, the assistant wasn't stuck thinking about UI stuff from earlier.
 
-The most effective feature was having the assistant actually *run* the code after every change (`python main.py`, `pytest`) rather than just writing it and moving on — this caught things a code review alone wouldn't, like confirming the recurring-task date math actually advanced by the right number of days. The most helpful prompts were the ones that referenced concrete files and asked a specific architectural question — e.g. "how should Scheduler retrieve tasks from Owner's pets?" — rather than vague asks like "make the scheduler smarter." Specific questions got specific, evaluable answers.
+The thing that helped most was having it actually run the code after every change instead of just writing it and trusting it worked — that caught real bugs, like double-checking the recurring task date math actually added the right number of days. Asking specific questions also worked way better than vague ones. "How should Scheduler get tasks from Owner's pets?" got me a real answer I could evaluate. "Make the scheduler smarter" wouldn't have.
 
 **b. Judgment and verification**
 
-When asked to evaluate `detect_conflicts()` for readability, the assistant offered a more "Pythonic" rewrite using `collections.defaultdict` and a list comprehension. I rejected it and kept the original explicit loop — the comprehension version was a few lines shorter but crammed the grouping, filtering, and string formatting into one nested expression, which is harder to scan for a grader or a future reader than the loop's plain top-to-bottom order. I verified both versions actually produced identical warning output before deciding, so the choice was about readability, not correctness.
+Like I mentioned above, I didn't accept the "more Pythonic" rewrite of `detect_conflicts()` — I checked that both versions gave the same output, then picked the one that was easier to read, not the shorter one.
 
-**Being the "lead architect":** the assistant is fast at producing plausible, working code, but it doesn't know *why* a design choice matters to this specific app unless I supply that context — e.g., deciding `Scheduler` should hold an `Owner` reference (not a raw task list) so it stays in sync with pets added after construction was a judgment call I had to make and direct, not something the assistant volunteered unprompted. The main lesson: AI accelerates the "write it" step, but verifying it actually does what's intended — by running it, not just reading the diff — stays a human responsibility.
+Being the one steering the project meant I had to make the actual design calls myself — like deciding `Scheduler` should hold onto the `Owner` object instead of just a plain list of tasks, so it always stays up to date if I add more pets later. The AI didn't suggest that on its own; I had to ask for it and decide it made sense. The big lesson for me: AI is really fast at writing code, but I still have to actually run it and check it does what I meant, not just skim the code and assume it's right.
 
 ---
 
@@ -66,11 +66,11 @@ When asked to evaluate `detect_conflicts()` for readability, the assistant offer
 
 **a. What you tested**
 
-The test suite (`tests/test_pawpal.py`, 10 tests) covers: marking a task complete and adding a task to a pet (basic behaviors), `sort_by_time()` chronological ordering including an empty list, `Pet.complete_task()` correctly spawning the next occurrence for a `"daily"` task and creating nothing for a `"once"` task, `detect_conflicts()` correctly flagging a same-time clash and correctly finding none when times differ, filtering by pet/status with no matches, and generating a plan for an owner with zero pets. These mattered because they're exactly the algorithmic behaviors added in Phase 4 that have no visible feedback loop other than trusting the code — a subtly wrong `timedelta` or an off-by-one in the conflict grouping would be easy to miss just by reading the code.
+My test suite (`tests/test_pawpal.py`, 10 tests total) covers: marking a task done and adding tasks to a pet, sorting tasks by time (including with an empty list), completing a daily task correctly creates tomorrow's task (and a one-time task doesn't create anything), the conflict checker correctly catches a same-time clash and correctly finds nothing when times are different, filtering with no matches, and generating a plan for an owner with no pets yet. I focused on these because they're the parts of the app where a small mistake (like the date math being off by a day) wouldn't be obvious just from reading the code — I needed the tests to actually catch it.
 
 **b. Confidence**
 
-⭐⭐⭐⭐☆ (4/5). Core sorting, filtering, recurrence, and exact-time conflict detection are all verified by passing tests and by manually running `main.py`/the Streamlit app. If I had more time, I'd test: overlapping-but-not-identical time ranges (the known gap from section 2b), what happens when a recurring task keeps completing multiple times in a row (does the chain of `due_date`s stay correct?), and the exact boundary case where a task's duration brings `time_used` to precisely equal `available_minutes`.
+I'd give it about 4 out of 5 stars. The core stuff — sorting, filtering, recurring tasks, and exact-time conflicts — all work and are backed by passing tests. If I had more time I'd want to test: real overlapping time ranges (not just exact matches), what happens if a recurring task keeps getting completed over and over (does the date keep advancing correctly each time?), and the edge case where a task's duration lands exactly on the available time limit.
 
 ---
 
@@ -78,12 +78,12 @@ The test suite (`tests/test_pawpal.py`, 10 tests) covers: marking a task complet
 
 **a. What went well**
 
-I'm most satisfied with the `Owner → Pet → Task` / `Scheduler` split holding up as the design grew — going from a single pet to multiple pets, and from a static task list to a `Scheduler` that pulls live data through `Owner.get_all_tasks()`, only required extending existing classes rather than rearchitecting them. The Streamlit UI integration also went smoothly end-to-end: forms feed directly into the same `Pet.add_task()`/`Pet.complete_task()` methods the CLI demo and tests use, so there's one source of truth for the logic.
+I'm happiest with how the `Owner` / `Pet` / `Task` / `Scheduler` split held up as I kept adding features. Going from one pet to multiple pets, and from a simple task list to a scheduler that pulls live data from the owner, only meant extending the existing classes — I never had to tear anything down and start over. The Streamlit UI also connects cleanly to the same methods the CLI demo and tests use, so there's really only one version of the logic, not a UI copy and a "real" copy.
 
 **b. What you would improve**
 
-The biggest gap is that `detect_conflicts()` only catches exact time matches, not overlapping durations (documented in section 2b) — a real version of this app would need interval-overlap checking. I'd also want the UI to let an owner sort/filter the task list interactively (by pet, by status) instead of only ever seeing the full list sorted by time.
+The main thing I'd fix is the conflict checker only catching exact time matches instead of real overlaps — that's the biggest gap. I'd also want the UI to let you actually filter the task list by pet or by status, instead of always just showing everything sorted by time.
 
 **c. Key takeaway**
 
-The most important thing I learned is that AI collaboration works best as a tight loop of small, verifiable steps rather than one big "build the whole thing" request — asking for one class, running it, then asking for the next algorithm and running that, caught issues (like the missing `pet_name` context in Phase 1, or the conflict-detection tradeoff in Phase 4) while they were still small and easy to reason about. Being the "lead architect" meant making the calls the assistant couldn't make for me — what the classes should be responsible for, which tradeoffs were acceptable for this scenario — while relying on the assistant to execute those calls quickly and to actually run the result so I could verify it, not just read it.
+The biggest thing I learned is that working with AI works best in small steps — build one thing, run it, check it, then move to the next thing — instead of asking for the whole system at once. That's how I caught the missing pet-name bug early and made a real decision about the conflict-detection tradeoff instead of just accepting whatever came out first. Being the one in charge meant I had to make the actual calls about what each class should be responsible for and which shortcuts were okay for this project — the AI could write the code fast, but it couldn't decide that stuff for me, and it couldn't replace actually running the program to see if it worked.
