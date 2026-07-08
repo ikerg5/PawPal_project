@@ -61,17 +61,42 @@ Total time used: 50 minutes
 
 ```bash
 # Run the full test suite:
-pytest
+python -m pytest
 
 # Run with coverage:
 pytest --cov
 ```
 
+The suite (`tests/test_pawpal.py`) covers:
+- **Basic behaviors**: marking a task complete, adding a task increases a pet's task count
+- **Sorting**: `sort_by_time()` returns chronological order, and handles an empty task list
+- **Recurrence**: completing a `"daily"` task auto-creates the next day's occurrence; completing a `"once"` task creates nothing
+- **Conflict detection**: two tasks at the same time are flagged; tasks at different times are not
+- **Filtering edge cases**: filtering by a pet/status with no matches returns an empty list rather than erroring
+- **Empty state**: generating a plan for an owner with no pets returns an empty, zero-duration plan
+
 Sample test output:
 
 ```
-# Paste your pytest output here
+$ python -m pytest -v
+============================= test session starts ==============================
+collected 10 items
+
+tests/test_pawpal.py::test_mark_complete_changes_task_status PASSED      [ 10%]
+tests/test_pawpal.py::test_adding_task_increases_pet_task_count PASSED   [ 20%]
+tests/test_pawpal.py::test_sort_by_time_returns_chronological_order PASSED [ 30%]
+tests/test_pawpal.py::test_sort_by_time_on_empty_list_returns_empty_list PASSED [ 40%]
+tests/test_pawpal.py::test_completing_daily_task_creates_next_day_occurrence PASSED [ 50%]
+tests/test_pawpal.py::test_completing_a_one_time_task_creates_no_next_occurrence PASSED [ 60%]
+tests/test_pawpal.py::test_detect_conflicts_flags_tasks_at_the_same_time PASSED [ 70%]
+tests/test_pawpal.py::test_detect_conflicts_finds_none_when_times_differ PASSED [ 80%]
+tests/test_pawpal.py::test_filter_by_pet_with_no_matches_returns_empty_list PASSED [ 90%]
+tests/test_pawpal.py::test_generate_plan_for_owner_with_no_pets_returns_empty_plan PASSED [100%]
+
+============================== 10 passed in 0.02s ===============================
 ```
+
+**Confidence Level:** ⭐⭐⭐⭐☆ (4/5) — core sorting, filtering, recurrence, and exact-time conflict detection are all verified. The main known gap (see `reflection.md` 2b) is that conflict detection only catches exact time matches, not overlapping durations, so that's the main scenario not yet covered by tests.
 
 ## 📐 Smarter Scheduling
 
