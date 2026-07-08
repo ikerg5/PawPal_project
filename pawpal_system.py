@@ -1,5 +1,8 @@
 from dataclasses import dataclass, field
-from typing import List
+from datetime import date, timedelta
+from typing import List, Optional
+
+_RECURRENCE_INTERVALS = {"daily": timedelta(days=1), "weekly": timedelta(weeks=1)}
 
 
 @dataclass
@@ -9,13 +12,30 @@ class Task:
     title: str
     duration_minutes: int
     priority: str          # "high", "medium", or "low"
-    is_recurring: bool = False
+    time: str = ""         # scheduled time of day, "HH:MM" (24-hour), optional
+    frequency: str = "once"  # "once", "daily", or "weekly"
     is_complete: bool = False
     pet_name: str = ""     # filled in automatically by Pet.add_task()
+    due_date: date = field(default_factory=date.today)
 
     def mark_complete(self) -> None:
         """Flip this task's status to complete."""
         self.is_complete = True
+
+    def next_occurrence(self) -> Optional["Task"]:
+        """If this is a recurring task, return a fresh copy due at the next interval; otherwise None."""
+        interval = _RECURRENCE_INTERVALS.get(self.frequency)
+        if interval is None:
+            return None
+        return Task(
+            title=self.title,
+            duration_minutes=self.duration_minutes,
+            priority=self.priority,
+            time=self.time,
+            frequency=self.frequency,
+            pet_name=self.pet_name,
+            due_date=self.due_date + interval,
+        )
 
     def display(self) -> str:
         """Return a one-line human-readable summary of this task."""
@@ -36,6 +56,14 @@ class Pet:
         """Tag a task with this pet's name and add it to the pet's task list."""
         task.pet_name = self.name
         self.tasks.append(task)
+
+    def complete_task(self, task: Task) -> Optional[Task]:
+        """Mark a task complete and, if it recurs, add and return its next occurrence."""
+        task.mark_complete()
+        next_task = task.next_occurrence()
+        if next_task is not None:
+            self.add_task(next_task)
+        return next_task
 
     @property
     def task_count(self) -> int:
@@ -75,6 +103,33 @@ class Scheduler:
     def sort_by_priority(self, tasks: List[Task]) -> List[Task]:
         """Return the given tasks ordered from highest to lowest priority."""
         return sorted(tasks, key=lambda t: self._PRIORITY_ORDER.get(t.priority, len(self._PRIORITY_ORDER)))
+
+    def sort_by_time(self, tasks: List[Task]) -> List[Task]:
+        """Return the given tasks ordered earliest to latest by their "HH:MM" time; untimed tasks sort last."""
+        return sorted(tasks, key=lambda t: t.time if t.time else "99:99")
+
+    def filter_by_pet(self, tasks: List[Task], pet_name: str) -> List[Task]:
+        """Return only the tasks belonging to the named pet."""
+        return [task for task in tasks if task.pet_name == pet_name]
+
+    def filter_by_status(self, tasks: List[Task], is_complete: bool) -> List[Task]:
+        """Return only the tasks matching the given completion status."""
+        return [task for task in tasks if task.is_complete == is_complete]
+
+    def detect_conflicts(self, tasks: List[Task]) -> List[str]:
+        """Return one warning string per group of tasks that share the same scheduled time (no crash)."""
+        tasks_by_time: dict[str, List[Task]] = {}
+        for task in tasks:
+            if not task.time:
+                continue
+            tasks_by_time.setdefault(task.time, []).append(task)
+
+        warnings = []
+        for time_slot, same_time_tasks in tasks_by_time.items():
+            if len(same_time_tasks) > 1:
+                names = ", ".join(f"{t.pet_name}: {t.title}" for t in same_time_tasks)
+                warnings.append(f"Conflict at {time_slot} — {names}")
+        return warnings
 
     def filter_by_time(self, sorted_tasks: List[Task]) -> List[Task]:
         """Return the leading tasks that fit within the owner's available minutes."""

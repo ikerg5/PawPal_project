@@ -37,8 +37,11 @@ I fixed this by adding `pet_name` and `species` fields to both `Scheduler.__init
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+`Scheduler.detect_conflicts()` only checks for **exact time matches** (two tasks with the identical `"HH:MM"` string) rather than checking whether task durations actually *overlap*. For example, a 30-minute walk starting at 08:00 and a 10-minute feeding starting at 08:15 would not be flagged, even though the walk is still in progress when the feeding starts.
+
+I chose exact-match checking because it's simple, fast (an O(n) grouping by time string), and easy to reason about, which matters for a first pass at conflict detection. The tradeoff is that it will miss genuine overlaps that don't share a start time. This is reasonable for now because most pet care tasks in this app are short and manually scheduled by the owner, so exact clashes are the most common and most obviously avoidable case — but a more accurate version would need to compare `[start, start + duration]` time ranges pairwise instead of just grouping by a single time string.
+
+I also considered rewriting `detect_conflicts()` with a `collections.defaultdict` and a list comprehension instead of the explicit loop with `setdefault()`. I kept the explicit loop version — it's a few lines longer, but reads top-to-bottom in the order the logic actually executes (group, then filter, then format), which matters more than saving a few lines in a project meant to be read and graded.
 
 ---
 
